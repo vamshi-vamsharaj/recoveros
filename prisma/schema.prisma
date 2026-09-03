@@ -7,8 +7,401 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Test {
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum CheckoutSessionStatus {
+  STARTED
+  ABANDONED
+  COMPLETED
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  PAUSED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum MandateStatus {
+  ACTIVE
+  PAUSED
+  REVOKED
+  EXPIRED
+}
+
+// Where a RecoveryCase originated from. Only PAYMENT is used by the
+// payment-degradation workflow implemented in Milestone 2. The others
+// exist so the schema does not need to change when future workflows
+// (checkout-dropoff, subscription-failure, invoice-overdue, mandate-retry)
+// are added.
+enum RecoveryCaseSourceType {
+  PAYMENT
+  CHECKOUT_SESSION
+  SUBSCRIPTION
+  INVOICE
+  MANDATE
+}
+
+enum RecoveryCaseStatus {
+  DETECTED
+  RECOMMENDED
+  APPROVED
+  EXECUTING
+  RECOVERED
+  BLOCKED
+  FAILED
+}
+
+enum RecoveryStrategy {
+  PAYMENT_LINK
+  RETRY_CARD
+  SEND_REMINDER
+  OFFER_DISCOUNT
+  ALTERNATE_METHOD
+}
+
+enum ConfidenceLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum PolicyEvaluationResult {
+  APPROVED
+  BLOCKED
+}
+
+enum RecoveryAttemptStatus {
+  EXECUTING
+  RECOVERED
+  FAILED
+}
+
+enum PromiseToPayStatus {
+  PENDING
+  KEPT
+  BROKEN
+}
+
+enum WebhookEventStatus {
+  RECEIVED
+  PROCESSED
+  FAILED
+}
+
+enum AuditEventType {
+  RECOVERY_CASE_CREATED
+  DECISION_CREATED
+  POLICY_EVALUATED
+  ACTION_APPROVED
+  ACTION_BLOCKED
+  EXECUTION_STARTED
+  EXECUTION_COMPLETED
+  RECOVERY_VERIFIED
+}
+
+// ============================================================
+// CORE / MERCHANT DOMAIN
+// ============================================================
+
+model Merchant {
   id        String   @id @default(cuid())
-  message   String
+  name      String
+  email     String   @unique
   createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  customers         Customer[]
+  payments          Payment[]
+  checkoutSessions  CheckoutSession[]
+  subscriptions     Subscription[]
+  invoices          Invoice[]
+  mandates          Mandate[]
+  policies          Policy[]
+  recoveryCases     RecoveryCase[]
+  webhookEvents     WebhookEvent[]
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  merchantId String
+  merchant   Merchant @relation(fields: [merchantId], references: [id])
+  name       String
+  email      String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  payments         Payment[]
+  checkoutSessions CheckoutSession[]
+  subscriptions    Subscription[]
+  invoices         Invoice[]
+  mandates         Mandate[]
+  recoveryCases    RecoveryCase[]
+  promisesToPay    PromiseToPay[]
+
+  @@index([merchantId])
+}
+
+// ============================================================
+// REVENUE ENTITIES
+// ============================================================
+
+model Payment {
+  id            String        @id @default(cuid())
+  merchantId    String
+  merchant      Merchant      @relation(fields: [merchantId], references: [id])
+  customerId    String
+  customer      Customer      @relation(fields: [customerId], references: [id])
+  amount        Int
+  currency      String        @default("INR")
+  status        PaymentStatus
+  failureReason String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  recoveryCases RecoveryCase[]
+
+  @@index([merchantId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model CheckoutSession {
+  id         String                 @id @default(cuid())
+  merchantId String
+  merchant   Merchant               @relation(fields: [merchantId], references: [id])
+  customerId String?
+  customer   Customer?              @relation(fields: [customerId], references: [id])
+  amount     Int
+  currency   String                 @default("INR")
+  status     CheckoutSessionStatus  @default(STARTED)
+  createdAt  DateTime               @default(now())
+  updatedAt  DateTime               @updatedAt
+
+  @@index([merchantId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model Subscription {
+  id               String              @id @default(cuid())
+  merchantId       String
+  merchant         Merchant            @relation(fields: [merchantId], references: [id])
+  customerId       String
+  customer         Customer            @relation(fields: [customerId], references: [id])
+  planName         String
+  amount           Int
+  currency         String              @default("INR")
+  status           SubscriptionStatus  @default(ACTIVE)
+  currentPeriodEnd DateTime
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([merchantId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model Invoice {
+  id         String        @id @default(cuid())
+  merchantId String
+  merchant   Merchant      @relation(fields: [merchantId], references: [id])
+  customerId String
+  customer   Customer      @relation(fields: [customerId], references: [id])
+  amount     Int
+  currency   String        @default("INR")
+  status     InvoiceStatus @default(OPEN)
+  dueDate    DateTime
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([merchantId])
+  @@index([customerId])
+  @@index([status])
+}
+
+model Mandate {
+  id         String        @id @default(cuid())
+  merchantId String
+  merchant   Merchant      @relation(fields: [merchantId], references: [id])
+  customerId String
+  customer   Customer      @relation(fields: [customerId], references: [id])
+  status     MandateStatus @default(ACTIVE)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  @@index([merchantId])
+  @@index([customerId])
+  @@index([status])
+}
+
+// ============================================================
+// RECOVERY DOMAIN
+// ============================================================
+
+// A RecoveryCase represents revenue at risk. It is created by a
+// detection routine (Milestone 2: FAILED payments) and tracked
+// through decision -> policy -> execution -> verification.
+model RecoveryCase {
+  id              String                  @id @default(cuid())
+  merchantId      String
+  merchant        Merchant                @relation(fields: [merchantId], references: [id])
+  customerId      String
+  customer        Customer                @relation(fields: [customerId], references: [id])
+  sourceType      RecoveryCaseSourceType
+  paymentId       String?
+  payment         Payment?                @relation(fields: [paymentId], references: [id])
+  status          RecoveryCaseStatus      @default(DETECTED)
+  amount          Int
+  currency        String                  @default("INR")
+  recoveredAmount Int?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  decisions     RecoveryDecision[]
+  attempts      RecoveryAttempt[]
+  auditLogs     AuditLog[]
+  promisesToPay PromiseToPay[]
+
+  @@index([merchantId])
+  @@index([customerId])
+  @@index([paymentId])
+  @@index([status])
+}
+
+// A recommendation produced by a DecisionProvider (Milestone 2:
+// StubDecisionProvider). A RecoveryDecision can exist without a
+// RecoveryAttempt -- this happens when its PolicyEvaluation is BLOCKED.
+model RecoveryDecision {
+  id             String           @id @default(cuid())
+  recoveryCaseId String
+  recoveryCase   RecoveryCase     @relation(fields: [recoveryCaseId], references: [id])
+  strategy       RecoveryStrategy
+  reason         String
+  confidence     ConfidenceLevel
+  providerName   String
+  rawOutput      Json
+  createdAt      DateTime         @default(now())
+
+  policyEvaluation PolicyEvaluation?
+  attempts         RecoveryAttempt[]
+
+  @@index([recoveryCaseId])
+}
+
+model Policy {
+  id          String   @id @default(cuid())
+  merchantId  String
+  merchant    Merchant @relation(fields: [merchantId], references: [id])
+  name        String
+  isEnabled   Boolean  @default(true)
+  maxAttempts Int      @default(3)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  evaluations PolicyEvaluation[]
+
+  @@index([merchantId])
+}
+
+// Every RecoveryDecision must be evaluated exactly once against a
+// Policy. This record is the sole gate between a decision and execution.
+model PolicyEvaluation {
+  id                 String                 @id @default(cuid())
+  recoveryDecisionId String                 @unique
+  recoveryDecision   RecoveryDecision       @relation(fields: [recoveryDecisionId], references: [id])
+  policyId           String
+  policy             Policy                 @relation(fields: [policyId], references: [id])
+  result             PolicyEvaluationResult
+  reason             String
+  createdAt          DateTime               @default(now())
+
+  attempts RecoveryAttempt[]
+
+  @@index([policyId])
+  @@index([result])
+}
+
+// Created only when a PolicyEvaluation result is APPROVED and the
+// Recovery Orchestrator has invoked an adapter (Milestone 2: SimulatedAdapter).
+model RecoveryAttempt {
+  id                 String                 @id @default(cuid())
+  recoveryCaseId     String
+  recoveryCase       RecoveryCase           @relation(fields: [recoveryCaseId], references: [id])
+  recoveryDecisionId String
+  recoveryDecision   RecoveryDecision       @relation(fields: [recoveryDecisionId], references: [id])
+  policyEvaluationId String
+  policyEvaluation   PolicyEvaluation       @relation(fields: [policyEvaluationId], references: [id])
+  adapterName        String
+  status             RecoveryAttemptStatus  @default(EXECUTING)
+  recoveredAmount    Int?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([recoveryCaseId])
+  @@index([recoveryDecisionId])
+  @@index([policyEvaluationId])
+}
+
+model PromiseToPay {
+  id             String             @id @default(cuid())
+  recoveryCaseId String?
+  recoveryCase   RecoveryCase?      @relation(fields: [recoveryCaseId], references: [id])
+  customerId     String
+  customer       Customer           @relation(fields: [customerId], references: [id])
+  amount         Int
+  promisedDate   DateTime
+  status         PromiseToPayStatus @default(PENDING)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([recoveryCaseId])
+  @@index([customerId])
+}
+
+model WebhookEvent {
+  id          String             @id @default(cuid())
+  merchantId  String?
+  merchant    Merchant?          @relation(fields: [merchantId], references: [id])
+  source      String
+  eventType   String
+  payload     Json
+  status      WebhookEventStatus @default(RECEIVED)
+  createdAt   DateTime           @default(now())
+  processedAt DateTime?
+
+  @@index([merchantId])
+  @@index([status])
+}
+
+// Append-only trail of every important transition in the recovery
+// pipeline. See AuditEventType for the full set of recorded events.
+model AuditLog {
+  id             String         @id @default(cuid())
+  recoveryCaseId String?
+  recoveryCase   RecoveryCase?  @relation(fields: [recoveryCaseId], references: [id])
+  eventType      AuditEventType
+  actor          String
+  metadata       Json
+  createdAt      DateTime       @default(now())
+
+  @@index([recoveryCaseId])
+  @@index([eventType])
 }

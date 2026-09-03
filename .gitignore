@@ -1,4 +1,14 @@
-node_modules
+node_modules/
+.next/
+dist/
+.dist/
 .env
-.next
-dist
+.env*.local
+*.patch
+coverage/
+out/
+build/
+*.log
+*.tsbuildinfo
+.vercel/
+PROJECT_STATUS.md

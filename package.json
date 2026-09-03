@@ -10,10 +10,19 @@
     "dev:web": "npm run dev -w apps/web",
     "dev:api": "npm run dev -w apps/api",
     "build": "npm run build --workspaces",
-    "dev": "concurrently \"npm run dev:web\" \"npm run dev:api\""
+    "dev": "concurrently \"npm run dev:web\" \"npm run dev:api\"",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:seed": "prisma db seed",
+    "test": "npm run test -w apps/api"
+  },
+  "prisma": {
+    "seed": "tsx apps/api/src/scripts/seed.ts"
   },
   "devDependencies": {
-    "concurrently": "^9.0.0"
+    "concurrently": "^9.0.0",
+    "prisma": "^5.22.0",
+    "tsx": "^4.23.12"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0"

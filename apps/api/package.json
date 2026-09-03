@@ -2,21 +2,30 @@
   "name": "api",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "seed": "tsx src/scripts/seed.ts",
+    "recover": "tsx src/scripts/run-payment-recovery.ts"
   },
   "dependencies": {
+    "@prisma/client": "^5.22.0",
     "bullmq": "^6.3.1",
     "cors": "^2.8.6",
+    "dotenv": "^16.4.5",
     "express": "^5.2.1",
-    "ioredis": "^6.0.0"
+    "ioredis": "^6.0.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/node": "^20.14.0",
     "prisma": "^5.22.0",
-    "tsx": "^4.23.12"
+    "tsx": "^4.23.12",
+    "vitest": "^2.1.5"
   }
 }
