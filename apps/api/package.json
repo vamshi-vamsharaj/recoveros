@@ -9,15 +9,18 @@
     "start": "node dist/server.js",
     "test": "vitest run",
     "seed": "tsx src/scripts/seed.ts",
-    "recover": "tsx src/scripts/run-payment-recovery.ts"
+    "recover": "tsx src/scripts/run-payment-recovery.ts",
+    "worker:webhook": "tsx src/scripts/run-webhook-worker.ts"
   },
   "dependencies": {
+    "@google/genai": "^1.52.0",
     "@prisma/client": "^5.22.0",
     "bullmq": "^6.3.1",
     "cors": "^2.8.6",
     "dotenv": "^16.4.5",
     "express": "^5.2.1",
     "ioredis": "^6.0.0",
+    "razorpay": "^2.9.8",
     "zod": "^3.23.8"
   },
   "devDependencies": {

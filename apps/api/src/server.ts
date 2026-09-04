@@ -3,10 +3,20 @@ import express from "express";
 import cors from "cors";
 import { prisma } from "./lib/prisma.js";
 import { workflowRegistry } from "./workflows/registry.js";
+import { razorpayWebhookRouter } from "./webhooks/razorpay.webhook.js";
 
 const app = express();
 
 app.use(cors());
+
+// Mounted BEFORE express.json(): Razorpay webhook signature
+// verification needs the exact raw request body. If this route were
+// registered after the global json() middleware below, Express would
+// have already parsed (and consumed) the body, and the signature
+// check would fail against re-serialized JSON that no longer matches
+// what Razorpay actually signed.
+app.use("/api/webhooks", razorpayWebhookRouter);
+
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
@@ -18,7 +28,10 @@ app.get("/health", (_req, res) => {
 
 // Runs the complete payment-degradation recovery pipeline against a
 // seeded FAILED payment: detection -> decision -> policy evaluation
-// -> approval gate -> simulated execution -> verification.
+// -> approval gate -> execution -> verification. Which decision
+// provider / adapter actually run depends on environment configuration
+// (see workflows/payment-degradation.handler.ts) -- this route itself
+// is unchanged from Milestone 2.
 app.post("/api/recovery/payment/:paymentId/run", async (req, res) => {
   const { paymentId } = req.params;
 

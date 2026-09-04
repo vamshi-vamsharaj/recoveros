@@ -115,6 +115,14 @@ enum AuditEventType {
   EXECUTION_STARTED
   EXECUTION_COMPLETED
   RECOVERY_VERIFIED
+  // Milestone 4 additions -- webhook ingestion/processing audit trail.
+  // Gemini fallback (Milestone 3) deliberately does NOT get a new
+  // event type here: it's recorded in RecoveryDecision.rawOutput,
+  // which the existing DECISION_CREATED event already references.
+  WEBHOOK_RECEIVED
+  WEBHOOK_DUPLICATE_IGNORED
+  WEBHOOK_SIGNATURE_INVALID
+  WEBHOOK_PROCESSED
 }
 
 // ============================================================
@@ -352,12 +360,22 @@ model RecoveryAttempt {
   adapterName        String
   status             RecoveryAttemptStatus  @default(EXECUTING)
   recoveredAmount    Int?
+  // Milestone 4 additions. Nullable/additive -- SimulatedAdapter never
+  // sets these, so Milestone 2 rows and behavior are unaffected.
+  // providerReference: external id from the adapter's provider (e.g. a
+  // Razorpay Payment Link id, "plink_..."), set by RazorpayAdapter and
+  // used by workers/webhook.worker.ts to find this attempt again when
+  // a payment_link.paid webhook confirms (or payment_link.expired /
+  // cancelled denies) recovery.
+  providerReference  String?
+  providerMetadata   Json?
   createdAt          DateTime               @default(now())
   updatedAt          DateTime               @updatedAt
 
   @@index([recoveryCaseId])
   @@index([recoveryDecisionId])
   @@index([policyEvaluationId])
+  @@index([providerReference])
 }
 
 model PromiseToPay {
@@ -382,6 +400,13 @@ model WebhookEvent {
   merchant    Merchant?          @relation(fields: [merchantId], references: [id])
   source      String
   eventType   String
+  // Milestone 4 addition. The DB-level uniqueness constraint IS the
+  // dedup mechanism for webhook ingestion (webhooks/razorpay.webhook.ts
+  // relies on the resulting P2002 error, not an in-memory check).
+  // Populated from the X-Razorpay-Event-Id header when present, else a
+  // sha256 of the raw body as a best-effort fallback. Nullable so this
+  // stays additive for any other/older WebhookEvent rows.
+  externalId  String?            @unique
   payload     Json
   status      WebhookEventStatus @default(RECEIVED)
   createdAt   DateTime           @default(now())
