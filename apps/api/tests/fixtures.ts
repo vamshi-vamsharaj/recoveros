@@ -55,3 +55,47 @@ export async function createFailedPayment(
     },
   });
 }
+
+/**
+ * Milestone 5 fixture. `customerId` is optional (nullable in the
+ * CheckoutSession schema) so tests can create a guest checkout to
+ * exercise checkout-dropoff.handler.ts's "no customer to attribute
+ * the case to" rejection path.
+ */
+export async function createCheckoutSession(
+  merchantId: string,
+  customerId: string | null,
+  opts?: { status?: "STARTED" | "ABANDONED" | "COMPLETED"; amount?: number }
+) {
+  return prisma.checkoutSession.create({
+    data: {
+      merchantId,
+      customerId,
+      amount: opts?.amount ?? 10000,
+      currency: "INR",
+      status: opts?.status ?? "ABANDONED",
+    },
+  });
+}
+
+/** Milestone 5 fixture for subscription-failure.handler.ts tests. */
+export async function createSubscription(
+  merchantId: string,
+  customerId: string,
+  opts?: {
+    status?: "ACTIVE" | "PAST_DUE" | "CANCELED" | "PAUSED";
+    amount?: number;
+  }
+) {
+  return prisma.subscription.create({
+    data: {
+      merchantId,
+      customerId,
+      planName: "Pro Plan",
+      amount: opts?.amount ?? 10000,
+      currency: "INR",
+      status: opts?.status ?? "PAST_DUE",
+      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    },
+  });
+}
