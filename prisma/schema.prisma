@@ -62,10 +62,22 @@ enum RecoveryCaseSourceType {
 enum RecoveryCaseStatus {
   DETECTED
   RECOMMENDED
+  // Milestone 6 addition. Set by the approval gate (see
+  // engine/approval-gate.ts) instead of auto-continuing, when a
+  // decision needs a human operator's review before execution. Purely
+  // additive: the pre-existing automatic path (APPROVED straight
+  // through to EXECUTING) is unchanged for cases that don't hit the
+  // human-approval condition, so no previously implemented test or
+  // workflow behavior changes.
+  PENDING_APPROVAL
   APPROVED
   EXECUTING
   RECOVERED
   BLOCKED
+  // Milestone 6 addition. Distinct from BLOCKED (the Policy Engine
+  // said no) -- REJECTED means a human operator reviewed a
+  // PENDING_APPROVAL case and declined it.
+  REJECTED
   FAILED
 }
 
@@ -123,6 +135,13 @@ enum AuditEventType {
   WEBHOOK_DUPLICATE_IGNORED
   WEBHOOK_SIGNATURE_INVALID
   WEBHOOK_PROCESSED
+  // Milestone 6 additions -- human-in-the-loop approval trail. Kept
+  // separate from the existing ACTION_APPROVED / ACTION_BLOCKED
+  // events, which record the automatic Approval Gate's pass-through
+  // of a Policy Engine result and are otherwise unchanged.
+  APPROVAL_REQUESTED
+  APPROVAL_GRANTED
+  APPROVAL_REJECTED
 }
 
 // ============================================================

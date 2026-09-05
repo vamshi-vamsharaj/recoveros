@@ -4,6 +4,7 @@ import cors from "cors";
 import { prisma } from "./lib/prisma.js";
 import { workflowRegistry } from "./workflows/registry.js";
 import { razorpayWebhookRouter } from "./webhooks/razorpay.webhook.js";
+import { dashboardRouter } from "./routes/recovery-dashboard.router.js";
 
 const app = express();
 
@@ -18,6 +19,10 @@ app.use(cors());
 app.use("/api/webhooks", razorpayWebhookRouter);
 
 app.use(express.json());
+
+// Milestone 6: read-only dashboard/case-list/case-detail routes plus
+// human approve/reject actions. See routes/recovery-dashboard.router.ts.
+app.use("/api", dashboardRouter);
 
 app.get("/health", (_req, res) => {
   res.json({

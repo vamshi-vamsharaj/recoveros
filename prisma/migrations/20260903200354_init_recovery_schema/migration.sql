@@ -434,3 +434,20 @@ ALTER TABLE "WebhookEvent" ADD CONSTRAINT "WebhookEvent_merchantId_fkey" FOREIGN
 
 -- AddForeignKey
 ALTER TABLE "AuditLog" ADD CONSTRAINT "AuditLog_recoveryCaseId_fkey" FOREIGN KEY ("recoveryCaseId") REFERENCES "RecoveryCase"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+
+-- Milestone 6: human-in-the-loop approval step.
+--
+-- Purely additive: two new RecoveryCaseStatus values and three new
+-- AuditEventType values. No existing enum values are renamed or
+-- removed, no columns are added or dropped, and no existing rows are
+-- touched. ALTER TYPE ... ADD VALUE cannot run inside a transaction
+-- block alongside statements that reference the new value, so this
+-- migration only adds the values -- nothing here consumes them.
+
+ALTER TYPE "RecoveryCaseStatus" ADD VALUE 'PENDING_APPROVAL';
+ALTER TYPE "RecoveryCaseStatus" ADD VALUE 'REJECTED';
+
+ALTER TYPE "AuditEventType" ADD VALUE 'APPROVAL_REQUESTED';
+ALTER TYPE "AuditEventType" ADD VALUE 'APPROVAL_GRANTED';
+ALTER TYPE "AuditEventType" ADD VALUE 'APPROVAL_REJECTED';
