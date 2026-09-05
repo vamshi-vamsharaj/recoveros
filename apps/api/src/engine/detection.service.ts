@@ -3,8 +3,7 @@ import { writeAuditLog } from "../audit/audit-logger.js";
 
 const ACTOR = "detection.service";
 
-// Statuses that mean "this RecoveryCase is already being worked" --
-// used to avoid creating a duplicate case for the same payment.
+
 const ACTIVE_CASE_STATUSES = [
   "DETECTED",
   "RECOMMENDED",
@@ -13,16 +12,7 @@ const ACTIVE_CASE_STATUSES = [
   "RECOVERED",
 ] as const;
 
-/**
- * Detects revenue at risk for a given payment. For Milestone 2,
- * detection is simply Payment.status === FAILED.
- *
- * Finds (or creates) a RecoveryCase for the payment:
- *   1. Look up the payment.
- *   2. Confirm it is FAILED.
- *   3. Check for an existing active RecoveryCase for this payment.
- *   4. If none exists, create one and write an AuditLog entry.
- */
+
 export async function detectFailedPayment(
   prisma: PrismaClient,
   paymentId: string

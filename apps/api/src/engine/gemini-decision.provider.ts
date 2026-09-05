@@ -8,31 +8,9 @@ import {
   isStrategyValidForWorkflow,
 } from "../ai/schemas/decision.schema.js";
 
-// Only "payment-degradation" is registered (see workflows/registry.ts),
-// so this provider is scoped to it for now. A future provider serving
-// multiple workflows would need this passed in rather than hardcoded.
+
 const WORKFLOW_NAME = "payment-degradation";
 
-/**
- * Real Gemini-backed recovery recommendation.
- *
- * Validation order (per the task's required boundary):
- *   Gemini Response -> Structured Parsing -> Zod Schema Validation
- *   -> Workflow Strategy Validation -> RecoveryDecision
- *
- * Falls back to a deterministic recommendation (by default,
- * StubDecisionProvider's) whenever Gemini's call fails, times out,
- * returns malformed/empty output, fails schema validation, or
- * recommends a strategy invalid for this workflow. The fallback is
- * itself validated through the same DecisionResultSchema every
- * DecisionProvider goes through -- it can never persist bad data, and
- * it never throws, so a Gemini outage cannot crash the pipeline.
- *
- * Like StubDecisionProvider, this class only ever returns a
- * recommendation -- it never calls an adapter or touches the
- * database. Implements the same DecisionProvider interface, so
- * recovery.orchestrator.ts requires no changes to use it.
- */
 export class GeminiDecisionProvider implements DecisionProvider {
   readonly name = "GeminiDecisionProvider";
   private readonly fallbackProvider: DecisionProvider;
@@ -80,19 +58,13 @@ export class GeminiDecisionProvider implements DecisionProvider {
       },
     };
 
-    // Same final validation gate every DecisionProvider goes through --
-    // a malformed candidate still cannot reach RecoveryDecision.
     return validateDecisionResult(candidate);
   }
 
   private async fallback(input: DecisionInput, reason: string): Promise<DecisionResult> {
     const fallbackResult = await this.fallbackProvider.decide(input);
 
-    // The fallback reason is preserved in RecoveryDecision.rawOutput
-    // (the existing audit architecture: recovery.orchestrator.ts's
-    // DECISION_CREATED audit entry references this decision by id,
-    // and rawOutput is persisted verbatim on the RecoveryDecision row)
-    // rather than inventing a new audit event type for it.
+
     return {
       ...fallbackResult,
       providerName: this.name,

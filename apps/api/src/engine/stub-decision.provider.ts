@@ -2,12 +2,6 @@ import type { DecisionProvider } from "./decision-provider.js";
 import { validateDecisionResult } from "./decision-provider.js";
 import type { DecisionInput, DecisionResult } from "./types.js";
 
-/**
- * Deterministic recovery recommendation. Stands in for a future
- * Claude-backed DecisionProvider -- it calls no AI API and always
- * returns the same recommendation shape for a given input, so demos
- * and tests are reproducible.
- */
 export class StubDecisionProvider implements DecisionProvider {
   readonly name = "StubDecisionProvider";
 
@@ -29,8 +23,6 @@ export class StubDecisionProvider implements DecisionProvider {
       },
     };
 
-    // Validated with Zod even though this provider is deterministic --
-    // the same validation path a future AI-backed provider will go through.
     return validateDecisionResult(candidate);
   }
 }

@@ -99,3 +99,67 @@ export async function createSubscription(
     },
   });
 }
+
+/** Milestone 7 fixture for invoice-overdue.handler.ts tests. */
+export async function createInvoice(
+  merchantId: string,
+  customerId: string,
+  opts?: {
+    status?: "DRAFT" | "OPEN" | "PAID" | "OVERDUE" | "VOID";
+    amount?: number;
+    dueDate?: Date;
+  }
+) {
+  return prisma.invoice.create({
+    data: {
+      merchantId,
+      customerId,
+      amount: opts?.amount ?? 10000,
+      currency: "INR",
+      status: opts?.status ?? "OVERDUE",
+      dueDate: opts?.dueDate ?? new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+    },
+  });
+}
+
+/** Milestone 7 fixture for mandate-failure.handler.ts tests. */
+export async function createMandate(
+  merchantId: string,
+  customerId: string,
+  opts?: {
+    status?: "ACTIVE" | "PAUSED" | "REVOKED" | "EXPIRED";
+    amount?: number | null;
+    currency?: string;
+  }
+) {
+  return prisma.mandate.create({
+    data: {
+      merchantId,
+      customerId,
+      status: opts?.status ?? "REVOKED",
+      amount: opts?.amount === undefined ? 10000 : opts.amount,
+      currency: opts?.currency ?? "INR",
+    },
+  });
+}
+
+/** Milestone 7 fixture for promise-to-pay.handler.ts tests. */
+export async function createPromiseToPay(
+  customerId: string,
+  opts?: {
+    amount?: number;
+    promisedDate?: Date;
+    status?: "PENDING" | "KEPT" | "BROKEN";
+    recoveryCaseId?: string;
+  }
+) {
+  return prisma.promiseToPay.create({
+    data: {
+      customerId,
+      amount: opts?.amount ?? 10000,
+      promisedDate: opts?.promisedDate ?? new Date(Date.now() - 24 * 60 * 60 * 1000),
+      status: opts?.status ?? "PENDING",
+      recoveryCaseId: opts?.recoveryCaseId ?? null,
+    },
+  });
+}

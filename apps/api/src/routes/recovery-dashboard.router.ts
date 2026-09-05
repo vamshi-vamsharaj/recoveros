@@ -3,29 +3,10 @@ import { RecoveryCaseStatus } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { approveRecoveryCase, rejectRecoveryCase } from "../engine/approval-service.js";
 
-/**
- * Milestone 6 addition. Every route here is read-only or (for
- * approve/reject) calls straight into approval-service.ts, which
- * itself only reuses the existing orchestrator's execution path (see
- * engine/recovery.orchestrator.ts). No route in this file writes to
- * the database directly except via that shared service -- this file
- * has no engine/policy/workflow logic of its own.
- *
- * There is exactly one Merchant seeded in this project (see
- * scripts/seed.ts), and no auth/session layer exists yet anywhere in
- * the codebase, so these routes operate merchant-wide rather than
- * scoping to a merchantId derived from a request. Scoping to a real
- * merchant/session is a pre-existing gap in the whole API, not
- * something this milestone introduces or should silently paper over.
- */
+
 export const dashboardRouter = Router();
 
-// Built from the generated RecoveryCaseStatus enum rather than raw
-// string literals: if the Prisma Client running this file is ever
-// out of sync with schema.prisma (e.g. `prisma generate` ran before
-// a migration added PENDING_APPROVAL/REJECTED), this fails to
-// *compile* instead of throwing a runtime "Invalid value for
-// argument `in`" error from inside a live request.
+
 const ACTIVE_STATUSES = [
   RecoveryCaseStatus.DETECTED,
   RecoveryCaseStatus.RECOMMENDED,

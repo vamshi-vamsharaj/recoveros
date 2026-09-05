@@ -16,31 +16,7 @@ export interface OrchestratorResult {
   blockedReason?: string;
 }
 
-/**
- * Coordinates the full recovery pipeline for an already-detected
- * RecoveryCase:
- *
- *   1. Ask the DecisionProvider for a recommendation, persist it as
- *      a RecoveryDecision.
- *   2. Run it through the Policy Engine (always creates a
- *      PolicyEvaluation).
- *   3. Pass the evaluation through the Approval Gate.
- *   4. If BLOCKED: stop. No RecoveryAttempt is created.
- *   5. If PENDING_APPROVAL (Milestone 6): stop. No RecoveryAttempt is
- *      created yet -- a human operator resumes this case later via
- *      approveRecoveryCase() / rejectRecoveryCase() in
- *      approval-service.ts, which re-uses the RecoveryDecision and
- *      PolicyEvaluation already persisted here rather than
- *      re-running the DecisionProvider or Policy Engine.
- *   6. If AUTO_APPROVED: invoke the RecoveryAdapter, create a
- *      RecoveryAttempt, verify the outcome, and update the
- *      RecoveryCase (executeApprovedRecovery, below).
- *
- * This is the ONLY module allowed to call adapter.execute() (via
- * executeApprovedRecovery). Workflow handlers must call this
- * orchestrator rather than adapters directly, and DecisionProviders
- * must never execute actions themselves.
- */
+
 export async function runRecoveryOrchestrator(
   prisma: PrismaClient,
   recoveryCase: RecoveryCase,
@@ -133,15 +109,7 @@ export async function runRecoveryOrchestrator(
   return executeApprovedRecovery(prisma, recoveryCase, decision, policyOutcome.id, adapter);
 }
 
-/**
- * Runs execution + verification for a RecoveryDecision that has
- * already cleared the Approval Gate (either automatically, in
- * runRecoveryOrchestrator above, or via a human operator approving a
- * PENDING_APPROVAL case in approval-service.ts). Extracted from
- * runRecoveryOrchestrator in Milestone 6 so both callers share
- * exactly one execution path -- this function is still the only place
- * that calls adapter.execute().
- */
+
 export async function executeApprovedRecovery(
   prisma: PrismaClient,
   recoveryCase: RecoveryCase,

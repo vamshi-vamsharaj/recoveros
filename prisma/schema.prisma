@@ -47,16 +47,20 @@ enum MandateStatus {
 }
 
 // Where a RecoveryCase originated from. Only PAYMENT is used by the
-// payment-degradation workflow implemented in Milestone 2. The others
-// exist so the schema does not need to change when future workflows
-// (checkout-dropoff, subscription-failure, invoice-overdue, mandate-retry)
-// are added.
+// payment-degradation workflow implemented in Milestone 2. Milestone 5
+// added CHECKOUT_SESSION and SUBSCRIPTION usage. Milestone 7 adds
+// PROMISE_TO_PAY (below) and puts INVOICE / MANDATE into real use.
 enum RecoveryCaseSourceType {
   PAYMENT
   CHECKOUT_SESSION
   SUBSCRIPTION
   INVOICE
   MANDATE
+  // Milestone 7 addition: promise-to-pay workflow. Additive-only --
+  // every existing RecoveryCase row and every existing sourceType
+  // comparison (payment-degradation, checkout-dropoff,
+  // subscription-failure) is unaffected by adding a new enum value.
+  PROMISE_TO_PAY
 }
 
 enum RecoveryCaseStatus {
@@ -271,6 +275,15 @@ model Mandate {
   customerId String
   customer   Customer      @relation(fields: [customerId], references: [id])
   status     MandateStatus @default(ACTIVE)
+  // Milestone 7 addition (mandate-failure workflow): RecoveryCase.amount
+  // is NOT NULL, so a mandate needs a recorded amount to become a
+  // RecoveryCase. `amount` stays nullable rather than defaulting to 0 --
+  // a mandate with no recorded amount is rejected by detection rather
+  // than silently recovering a fabricated value (see
+  // workflows/mandate-failure.handler.ts). `currency` defaults to "INR"
+  // like every other monetary field in this schema, so it's non-null.
+  amount     Int?
+  currency   String        @default("INR")
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 
