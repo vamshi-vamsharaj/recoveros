@@ -1,83 +1,136 @@
-import type { BatchMetrics, BatchWorkflowName, ScenarioResult, WorkflowMetrics } from "./types.js";
+import { BATCH_WORKFLOW_KEYS } from "./types.js";
+import type {
+  BatchMetrics,
+  ScenarioEvaluationResult,
+  WorkflowMetrics,
+} from "./types.js";
 
-const WORKFLOW_ORDER: BatchWorkflowName[] = [
-  "payment-degradation",
-  "checkout-dropoff",
-  "subscription-failure",
-  "invoice-overdue",
-  "mandate-failure",
-  "promise-to-pay",
-];
+const RECOVERED_STATUS = "RECOVERED";
+const BLOCKED_STATUS = "BLOCKED";
+const FAILED_STATUS = "FAILED";
 
-function safeDivide(numerator: number, denominator: number): number | null {
-  if (denominator <= 0) return null;
+export function safeDivide(numerator: number, denominator: number): number | null {
+  if (denominator === 0) return null;
   return numerator / denominator;
 }
 
-export function calculateBatchMetrics(results: ScenarioResult[]): BatchMetrics {
-  const totalScenarios = results.length;
+function safePercentImprovement(baseline: number, current: number): number | null {
+  if (baseline === 0) return null;
+  return ((current - baseline) / baseline) * 100;
+}
 
-  const totalRevenueAtRisk = results.reduce((sum, r) => sum + r.amount, 0);
-  const recoveredResults = results.filter((r) => r.status === "RECOVERED");
+function computeWorkflowMetrics(
+  workflow: (typeof BATCH_WORKFLOW_KEYS)[number],
+  results: ScenarioEvaluationResult[]
+): WorkflowMetrics {
+  const scenarioCount = results.length;
+  const revenueAtRisk = results.reduce((sum, r) => sum + r.amount, 0);
+  const recoveredResults = results.filter((r) => r.recoverOsStatus === RECOVERED_STATUS);
   const recoveredRevenue = recoveredResults.reduce(
-    (sum, r) => sum + (r.recoveredAmount ?? 0),
+    (sum, r) => sum + r.recoverOsRecoveredAmount,
     0
   );
-
   const recoveredCases = recoveredResults.length;
-  const blockedCases = results.filter((r) => r.status === "BLOCKED").length;
-  const failedCases = results.filter(
-    (r) => r.status === "FAILED" || r.status === "ERROR"
-  ).length;
-  const approvalRequiredCases = results.filter((r) => r.approvalRequired).length;
+  const recoveryRate = safeDivide(recoveredCases, scenarioCount);
 
-  const recoveryRate = safeDivide(recoveredCases, totalScenarios);
-  const averageRecoveryValue = safeDivide(recoveredRevenue, recoveredCases);
-
-  const baselineRecoveredRevenue = results.reduce(
+  const baselineRecoveredResults = results.filter((r) => r.baselineRecovered);
+  const baselineRecoveredRevenue = baselineRecoveredResults.reduce(
     (sum, r) => sum + r.baselineRecoveredAmount,
     0
   );
-  const baselineRecoveredCases = results.filter((r) => r.baselineRecovered).length;
-  const baselineRecoveryRate = safeDivide(baselineRecoveredCases, totalScenarios);
+  const baselineRecoveredCases = baselineRecoveredResults.length;
+  const baselineRecoveryRate = safeDivide(baselineRecoveredCases, scenarioCount);
 
-  const improvementOverBaseline =
-    baselineRecoveryRate !== null && recoveryRate !== null
-      ? recoveryRate - baselineRecoveryRate
-      : null;
-
-  const workflowBreakdown: WorkflowMetrics[] = WORKFLOW_ORDER.map((workflow) => {
-    const workflowResults = results.filter((r) => r.workflow === workflow);
-    const workflowRevenueAtRisk = workflowResults.reduce((sum, r) => sum + r.amount, 0);
-    const workflowRecoveredRevenue = workflowResults
-      .filter((r) => r.status === "RECOVERED")
-      .reduce((sum, r) => sum + (r.recoveredAmount ?? 0), 0);
-    const workflowRecoveredCases = workflowResults.filter(
-      (r) => r.status === "RECOVERED"
-    ).length;
-
-    return {
-      workflow,
-      scenarios: workflowResults.length,
-      revenueAtRisk: workflowRevenueAtRisk,
-      recoveredRevenue: workflowRecoveredRevenue,
-      recoveryRate: safeDivide(workflowRecoveredCases, workflowResults.length),
-    };
-  }).filter((row) => row.scenarios > 0);
+  const improvementPercentage = safePercentImprovement(
+    baselineRecoveredRevenue,
+    recoveredRevenue
+  );
 
   return {
-    totalScenarios,
-    totalRevenueAtRisk,
+    workflow,
+    scenarioCount,
+    revenueAtRisk,
     recoveredRevenue,
-    recoveryRate,
     recoveredCases,
-    blockedCases,
-    failedCases,
-    approvalRequiredCases,
-    averageRecoveryValue,
-    workflowBreakdown,
+    recoveryRate,
     baselineRecoveredRevenue,
+    baselineRecoveredCases,
     baselineRecoveryRate,
-    improvementOverBaseline,
+    improvementPercentage,
+  };
+}
+
+/**
+ * Pure metrics calculation for a batch of scenario evaluation
+ * results. Takes no database handle and performs no I/O, so it can be
+ * (and is, see tests/batch-evaluation.metrics.test.ts) unit tested
+ * with a fixed in-memory fixture and no Postgres/Redis/network
+ * dependency.
+ */
+export function calculateBatchMetrics(results: ScenarioEvaluationResult[]): BatchMetrics {
+  const totalScenarios = results.length;
+  const totalRevenueAtRisk = results.reduce((sum, r) => sum + r.amount, 0);
+
+  const recoveredResults = results.filter((r) => r.recoverOsStatus === RECOVERED_STATUS);
+  const totalRecoveredRevenue = recoveredResults.reduce(
+    (sum, r) => sum + r.recoverOsRecoveredAmount,
+    0
+  );
+  const recoveredCases = recoveredResults.length;
+  const blockedCases = results.filter((r) => r.recoverOsStatus === BLOCKED_STATUS).length;
+  const failedCases = results.filter((r) => r.recoverOsStatus === FAILED_STATUS).length;
+  const approvalRequiredCases = results.filter((r) => r.approvalRequired).length;
+
+  const recoveryRate = safeDivide(recoveredCases, totalScenarios);
+  const averageRecoveredValue = safeDivide(totalRecoveredRevenue, recoveredCases);
+
+  const baselineRecoveredResults = results.filter((r) => r.baselineRecovered);
+  const baselineRecoveredRevenue = baselineRecoveredResults.reduce(
+    (sum, r) => sum + r.baselineRecoveredAmount,
+    0
+  );
+  const baselineRecoveredCases = baselineRecoveredResults.length;
+  const baselineRecoveryRate = safeDivide(baselineRecoveredCases, totalScenarios);
+
+  const additionalRevenueRecovered = totalRecoveredRevenue - baselineRecoveredRevenue;
+  const recoveryRateImprovement =
+    recoveryRate === null || baselineRecoveryRate === null
+      ? null
+      : (recoveryRate - baselineRecoveryRate) * 100;
+  const percentageImprovementOverBaseline = safePercentImprovement(
+    baselineRecoveredRevenue,
+    totalRecoveredRevenue
+  );
+
+  const workflowBreakdown = BATCH_WORKFLOW_KEYS.map((workflow) =>
+    computeWorkflowMetrics(
+      workflow,
+      results.filter((r) => r.workflow === workflow)
+    )
+  );
+
+  return {
+    overall: {
+      totalScenarios,
+      totalRevenueAtRisk,
+      totalRecoveredRevenue,
+      recoveryRate,
+      recoveredCases,
+      blockedCases,
+      failedCases,
+      approvalRequiredCases,
+      averageRecoveredValue,
+    },
+    baseline: {
+      baselineRecoveredRevenue,
+      baselineRecoveredCases,
+      baselineRecoveryRate,
+    },
+    comparison: {
+      additionalRevenueRecovered,
+      recoveryRateImprovement,
+      percentageImprovementOverBaseline,
+    },
+    workflowBreakdown,
   };
 }
