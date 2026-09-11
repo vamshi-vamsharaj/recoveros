@@ -1,4 +1,4 @@
-export type BatchWorkflowName =
+export type BatchWorkflowKey =
   | "payment-degradation"
   | "checkout-dropoff"
   | "subscription-failure"
@@ -6,67 +6,100 @@ export type BatchWorkflowName =
   | "mandate-failure"
   | "promise-to-pay";
 
-export type BatchRiskCondition =
-  | "normal-recovery"
-  | "high-value-approval"
-  | "policy-disabled"
-  | "retry-exhausted";
+export const BATCH_WORKFLOW_KEYS: BatchWorkflowKey[] = [
+  "payment-degradation",
+  "checkout-dropoff",
+  "subscription-failure",
+  "invoice-overdue",
+  "mandate-failure",
+  "promise-to-pay",
+];
 
-export interface ScenarioDefinition {
-  scenarioId: string;
-  workflow: BatchWorkflowName;
-  riskCondition: BatchRiskCondition;
+export interface BatchScenario {
+  id: string;
+  workflow: BatchWorkflowKey;
   amount: number;
   currency: string;
-  policy: {
-    isEnabled: boolean;
-    maxAttempts: number;
-  };
+  condition: string;
+  riskTier: "LOW" | "MEDIUM" | "HIGH";
+  useDisabledPolicy: boolean;
 }
 
-export type ScenarioExecutionStatus =
-  | "RECOVERED"
-  | "BLOCKED"
-  | "PENDING_APPROVAL"
-  | "FAILED"
-  | "ERROR";
-
-export interface ScenarioResult {
+export interface BaselineScenarioResult {
   scenarioId: string;
-  workflow: BatchWorkflowName;
-  riskCondition: BatchRiskCondition;
+  recovered: boolean;
+  recoveredAmount: number;
+}
+
+export interface ScenarioEvaluationResult {
+  scenarioId: string;
+  workflow: BatchWorkflowKey;
   amount: number;
   currency: string;
-  recoveryCaseId: string | null;
-  status: ScenarioExecutionStatus;
-  recoveredAmount: number | null;
-  blockedReason: string | null;
+  condition: string;
+  riskTier: "LOW" | "MEDIUM" | "HIGH";
+  recoveryCaseId: string;
+  recoverOsStatus: string;
+  recoverOsRecoveredAmount: number;
   approvalRequired: boolean;
   baselineRecovered: boolean;
   baselineRecoveredAmount: number;
-  errorMessage: string | null;
 }
 
 export interface WorkflowMetrics {
-  workflow: BatchWorkflowName;
-  scenarios: number;
+  workflow: BatchWorkflowKey;
+  scenarioCount: number;
   revenueAtRisk: number;
   recoveredRevenue: number;
+  recoveredCases: number;
   recoveryRate: number | null;
+  baselineRecoveredRevenue: number;
+  baselineRecoveredCases: number;
+  baselineRecoveryRate: number | null;
+  improvementPercentage: number | null;
 }
 
-export interface BatchMetrics {
+export interface OverallMetrics {
   totalScenarios: number;
   totalRevenueAtRisk: number;
-  recoveredRevenue: number;
+  totalRecoveredRevenue: number;
   recoveryRate: number | null;
   recoveredCases: number;
   blockedCases: number;
   failedCases: number;
   approvalRequiredCases: number;
-  averageRecoveryValue: number | null;
-  workflowBreakdown: WorkflowMetrics[];
+  averageRecoveredValue: number | null;
+}
+
+export interface BaselineMetrics {
   baselineRecoveredRevenue: number;
+  baselineRecoveredCases: number;
   baselineRecoveryRate: number | null;
-  improvementOverBaseline: number | null;
+}
+
+export interface ComparisonMetrics {
+  additionalRevenueRecovered: number;
+  recoveryRateImprovement: number | null;
+  percentageImprovementOverBaseline: number | null;
+}
+
+export interface BatchMetrics {
+  overall: OverallMetrics;
+  baseline: BaselineMetrics;
+  comparison: ComparisonMetrics;
+  workflowBreakdown: WorkflowMetrics[];
+}
+
+export interface BatchEvaluationSummary {
+  id: string;
+  status: "RUNNING" | "COMPLETED" | "FAILED";
+  scenarioCount: number;
+  createdAt: Date;
+  completedAt: Date | null;
+  metrics: BatchMetrics | null;
+}
+
+export interface BatchEvaluationDetail extends BatchEvaluationSummary {
+  errorMessage: string | null;
+  scenarios: ScenarioEvaluationResult[];
 }
