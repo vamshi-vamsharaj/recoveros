@@ -6,6 +6,11 @@ import type {
   RecoveryCaseStatus,
   RecoveryCaseSourceType,
 } from "@/types";
+import type {
+  GetBatchEvaluationResponse,
+  ListBatchEvaluationsResponse,
+  RunBatchEvaluationResponse,
+} from "@/types/batch-evaluation";
 
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -89,4 +94,13 @@ export const api = {
       `/api/recovery/cases/${id}/reject`,
       { method: "POST", body: JSON.stringify({ reason }) }
     ),
+
+  runBatchEvaluation: () =>
+    request<RunBatchEvaluationResponse>("/api/batch-evaluation/run", { method: "POST" }),
+
+  getBatchEvaluations: () =>
+    request<ListBatchEvaluationsResponse>("/api/batch-evaluation"),
+
+  getBatchEvaluation: (id: string) =>
+    request<GetBatchEvaluationResponse>(`/api/batch-evaluation/${id}`),
 };
