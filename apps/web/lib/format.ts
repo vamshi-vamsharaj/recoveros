@@ -88,3 +88,31 @@ const EVENT_TYPE_LABEL: Record<string, string> = {
 export function formatEventType(eventType: string): string {
   return EVENT_TYPE_LABEL[eventType] ?? eventType;
 }
+
+export const BATCH_WORKFLOW_LABEL: Record<
+  | "payment-degradation"
+  | "checkout-dropoff"
+  | "subscription-failure"
+  | "invoice-overdue"
+  | "mandate-failure"
+  | "promise-to-pay",
+  string
+> = {
+  "payment-degradation": "Payment Degradation",
+  "checkout-dropoff": "Checkout Drop-off",
+  "subscription-failure": "Subscription Failure",
+  "invoice-overdue": "Invoice Overdue",
+  "mandate-failure": "Mandate Failure",
+  "promise-to-pay": "Promise to Pay",
+};
+
+export function formatPercent(value: number | null, digits = 0): string {
+  if (value === null || Number.isNaN(value)) return "--";
+  return `${value.toFixed(digits)}%`;
+}
+
+export function formatSignedPercent(value: number | null, digits = 0): string {
+  if (value === null || Number.isNaN(value)) return "--";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(digits)}%`;
+}
