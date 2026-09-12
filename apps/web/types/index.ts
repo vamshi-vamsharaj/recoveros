@@ -119,3 +119,94 @@ export interface ApiErrorBody {
   success: false;
   error: string;
 }
+
+export type BatchWorkflowName =
+  | "payment-degradation"
+  | "checkout-dropoff"
+  | "subscription-failure"
+  | "invoice-overdue"
+  | "mandate-failure"
+  | "promise-to-pay";
+
+export type BatchRiskCondition =
+  | "normal-recovery"
+  | "high-value-approval"
+  | "policy-disabled"
+  | "retry-exhausted";
+
+export type ScenarioExecutionStatus =
+  | "RECOVERED"
+  | "BLOCKED"
+  | "PENDING_APPROVAL"
+  | "FAILED"
+  | "ERROR";
+
+export interface WorkflowMetrics {
+  workflow: BatchWorkflowName;
+  scenarios: number;
+  revenueAtRisk: number;
+  recoveredRevenue: number;
+  recoveryRate: number | null;
+}
+
+export interface BatchMetrics {
+  totalScenarios: number;
+  totalRevenueAtRisk: number;
+  recoveredRevenue: number;
+  recoveryRate: number | null;
+  recoveredCases: number;
+  blockedCases: number;
+  failedCases: number;
+  approvalRequiredCases: number;
+  averageRecoveryValue: number | null;
+  workflowBreakdown: WorkflowMetrics[];
+  baselineRecoveredRevenue: number;
+  baselineRecoveryRate: number | null;
+  improvementOverBaseline: number | null;
+}
+
+export interface BatchScenarioResultItem {
+  scenarioId: string;
+  workflow: BatchWorkflowName;
+  riskCondition: BatchRiskCondition;
+  amount: number;
+  currency: string;
+  recoveryCaseId: string | null;
+  status: ScenarioExecutionStatus;
+  recoveredAmount: number | null;
+  blockedReason: string | null;
+  approvalRequired: boolean;
+  baselineRecovered: boolean;
+  baselineRecoveredAmount: number;
+  errorMessage: string | null;
+}
+
+export interface BatchEvaluationRunResponse {
+  success: true;
+  id: string;
+  createdAt: string;
+  metrics: BatchMetrics;
+  scenarioResults: BatchScenarioResultItem[];
+}
+
+export interface BatchEvaluationDetailResponse {
+  id: string;
+  createdAt: string;
+  metrics: BatchMetrics;
+  scenarioResults: BatchScenarioResultItem[];
+}
+
+export interface BatchEvaluationListItem {
+  id: string;
+  createdAt: string;
+  totalScenarios: number;
+  totalRevenueAtRisk: number;
+  recoveredRevenue: number;
+  recoveryRate: number | null;
+  baselineRecoveryRate: number | null;
+  improvementOverBaseline: number | null;
+}
+
+export interface BatchEvaluationListResponse {
+  runs: BatchEvaluationListItem[];
+}
