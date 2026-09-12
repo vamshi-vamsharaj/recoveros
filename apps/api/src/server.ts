@@ -5,6 +5,7 @@ import { prisma } from "./lib/prisma.js";
 import { workflowRegistry } from "./workflows/registry.js";
 import { razorpayWebhookRouter } from "./webhooks/razorpay.webhook.js";
 import { dashboardRouter } from "./routes/recovery-dashboard.router.js";
+import { batchEvaluationRouter } from "./routes/batch-evaluation.router.js";
 
 const app = express();
 
@@ -23,6 +24,11 @@ app.use(express.json());
 // Milestone 6: read-only dashboard/case-list/case-detail routes plus
 // human approve/reject actions. See routes/recovery-dashboard.router.ts.
 app.use("/api", dashboardRouter);
+
+// Milestone 8: synthetic batch evaluation across all six workflows,
+// compared against a deterministic baseline. See
+// batch-evaluation/service.ts.
+app.use("/api", batchEvaluationRouter);
 
 app.get("/health", (_req, res) => {
   res.json({
