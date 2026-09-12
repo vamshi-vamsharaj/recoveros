@@ -29,6 +29,15 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    href: "/batch-evaluation",
+    label: "Batch Evaluation",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M4 19V10M10 19V5M16 19v-7M22 19H2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
 ];
 
 function Wordmark() {
