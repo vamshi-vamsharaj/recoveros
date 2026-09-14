@@ -122,6 +122,14 @@ enum WebhookEventStatus {
   FAILED
 }
 
+// Milestone 8 addition: batch-evaluation status. Purely additive --
+// no existing enum, table, or column is touched.
+enum BatchEvaluationStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
 enum AuditEventType {
   RECOVERY_CASE_CREATED
   DECISION_CREATED
@@ -446,6 +454,56 @@ model WebhookEvent {
 
   @@index([merchantId])
   @@index([status])
+}
+
+// Milestone 8 addition: a single run of the synthetic batch evaluator
+// across all six workflows. Deliberately NOT merchant-scoped -- the
+// batch evaluator provisions its own dedicated merchants/customers
+// (see batch-evaluation/runner.ts) so it never touches real seeded
+// data. `metrics` stores the full BatchMetrics object computed by the
+// pure metrics engine (batch-evaluation/metrics.ts) so GET requests
+// can serve frontend-ready data without recomputing it.
+model BatchEvaluation {
+  id            String                @id @default(cuid())
+  status        BatchEvaluationStatus @default(RUNNING)
+  scenarioCount Int
+  metrics       Json?
+  errorMessage  String?
+  createdAt     DateTime              @default(now())
+  completedAt   DateTime?
+
+  scenarioResults BatchScenarioResult[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// One row per synthetic scenario evaluated in a BatchEvaluation.
+// `workflow` mirrors the workflowRegistry key (e.g.
+// "payment-degradation") rather than RecoveryCaseSourceType, since a
+// scenario is a workflow-routing concept, not a RecoveryCase field.
+// `recoveryCaseId` links to the real RecoveryCase the batch runner
+// created and pushed through the actual Recovery Engine -- nullable
+// only so a scenario that failed before a RecoveryCase existed can
+// still be recorded rather than dropped.
+model BatchScenarioResult {
+  id                       String          @id @default(cuid())
+  batchEvaluationId        String
+  batchEvaluation          BatchEvaluation @relation(fields: [batchEvaluationId], references: [id])
+  scenarioId               String
+  workflow                 String
+  amount                   Int
+  currency                 String
+  recoveryCaseId           String?
+  recoverOsStatus          String
+  recoverOsRecoveredAmount Int
+  approvalRequired         Boolean         @default(false)
+  baselineRecovered        Boolean
+  baselineRecoveredAmount  Int
+  createdAt                DateTime        @default(now())
+
+  @@index([batchEvaluationId])
+  @@index([workflow])
 }
 
 // Append-only trail of every important transition in the recovery
